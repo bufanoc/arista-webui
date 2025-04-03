@@ -1,13 +1,229 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arista Switch Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 20px;
+        }
+        .nav-tabs .nav-link {
+            color: #495057;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: 500;
+        }
+        .table th {
+            font-weight: 500;
+        }
+        .progress {
+            height: 8px;
+        }
+        .form-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            padding: 20px;
+        }
+        .form-container {
+            background-color: white;
+            border-radius: 5px;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex align-items-center">
+                    <img src="https://www.arista.com/assets/images/Logo/Arista_Logo_RGB.png" alt="Arista Logo" height="40" class="me-3">
+                    <h1 class="mb-0">Switch Manager</h1>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="switchTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="true">
+                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ports-tab" data-bs-toggle="tab" data-bs-target="#ports" type="button" role="tab" aria-controls="ports" aria-selected="false">
+                            <i class="bi bi-ethernet me-1"></i>Port Configuration
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="vlans-tab" data-bs-toggle="tab" data-bs-target="#vlanManagement" type="button" role="tab" aria-controls="vlanManagement" aria-selected="false">
+                            <i class="bi bi-diagram-3 me-1"></i>VLAN Management
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="vxlan-tab" data-bs-toggle="tab" data-bs-target="#vxlan" type="button" role="tab" aria-controls="vxlan" aria-selected="false">
+                            <i class="bi bi-hdd-network me-1"></i>VXLAN Configuration
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="switchTabContent">
+                    <!-- Dashboard Tab -->
+                    <div class="tab-pane fade show active" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <h2>Dashboard</h2>
+                                <p class="text-muted">Overview of your Arista switch status and configuration.</p>
+                            </div>
+                        </div>
+                        
+                        <div id="switchInfo">
+                            <!-- Dashboard content will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Port Configuration Tab -->
+                    <div class="tab-pane fade" id="ports" role="tabpanel" aria-labelledby="ports-tab">
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <h2>Port Configuration</h2>
+                                <p class="text-muted">View and configure switch ports.</p>
+                            </div>
+                        </div>
+                        
+                        <div id="interfacesInfo">
+                            <!-- Interfaces content will be loaded here -->
+                        </div>
+                        
+                        <!-- Port Configuration Form -->
+                        <div id="portConfigForm" style="display: none;" class="mt-4 p-3 border rounded bg-light">
+                            <h3>Configure Port: <span id="selectedPort"></span></h3>
+                            <form>
+                                <div class="mb-3">
+                                    <label for="portDescription" class="form-label">Description</label>
+                                    <input type="text" class="form-control" id="portDescription" placeholder="Enter port description">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="adminStatus" class="form-label">Admin Status</label>
+                                    <select class="form-select" id="adminStatus">
+                                        <option value="up">Up</option>
+                                        <option value="down">Down</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="portMode" class="form-label">Port Mode</label>
+                                    <select class="form-select" id="portMode">
+                                        <option value="access">Access</option>
+                                        <option value="trunk">Trunk</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3" id="accessVlanGroup">
+                                    <label for="accessVlan" class="form-label">Access VLAN</label>
+                                    <input type="number" class="form-control" id="accessVlan" min="1" max="4094" value="1">
+                                </div>
+                                <div class="mb-3" id="trunkVlansGroup" style="display: none;">
+                                    <label for="trunkVlans" class="form-label">Allowed VLANs</label>
+                                    <input type="text" class="form-control" id="trunkVlans" placeholder="e.g., 1-10,20,30-40">
+                                </div>
+                                <div class="mb-3" id="nativeVlanGroup" style="display: none;">
+                                    <label for="nativeVlan" class="form-label">Native VLAN</label>
+                                    <input type="number" class="form-control" id="nativeVlan" min="1" max="4094" value="1">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="speed" class="form-label">Speed</label>
+                                    <select class="form-select" id="speed">
+                                        <option value="auto">Auto</option>
+                                        <option value="10">10 Mbps</option>
+                                        <option value="100">100 Mbps</option>
+                                        <option value="1000">1 Gbps</option>
+                                        <option value="10000">10 Gbps</option>
+                                        <option value="40000">40 Gbps</option>
+                                        <option value="100000">100 Gbps</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="duplex" class="form-label">Duplex</label>
+                                    <select class="form-select" id="duplex">
+                                        <option value="auto">Auto</option>
+                                        <option value="full">Full</option>
+                                        <option value="half">Half</option>
+                                    </select>
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-secondary me-2" id="cancelPortBtn">Cancel</button>
+                                    <button type="button" class="btn btn-primary" id="savePortBtn">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- VLAN Management Tab -->
+                    <div class="tab-pane fade" id="vlanManagement" role="tabpanel" aria-labelledby="vlans-tab">
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <h2>VLAN Management</h2>
+                                <p class="text-muted">Create, edit, and delete VLANs on your switch.</p>
+                            </div>
+                        </div>
+                        
+                        <div id="vlansInfo">
+                            <!-- VLANs content will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- VXLAN Configuration Tab -->
+                    <div class="tab-pane fade" id="vxlan" role="tabpanel" aria-labelledby="vxlan-tab">
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <h2>VXLAN Configuration</h2>
+                                <p class="text-muted">Configure VXLAN settings for your switch.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            VXLAN Configuration functionality will be implemented in the next phase.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Container for Notifications -->
+    <div class="toast-container"></div>
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="config.js"></script>
+    <script src="toast.js"></script>
+    <script src="dashboard.js"></script>
+    <script src="port_config.js"></script>
+    <script src="vlan_management.js"></script>
+    <script src="init.js"></script>
+</body>
 </html>

@@ -111,12 +111,15 @@ function pathToCommands(path, method, body) {
         }
         
         commands.push('exit');
+      } else if (method === 'DELETE' && resourceId) {
+        // Delete a VLAN
+        commands = [`configure`, `no vlan ${resourceId}`];
       }
       break;
       
     case 'vxlan':
       if (method === 'GET') {
-        commands = ['show vxlan config'];
+        commands = ['show vxlan config', 'show vxlan vni'];
       } else if (method === 'PUT' && body) {
         commands = ['configure', 'interface Vxlan1'];
         
@@ -127,7 +130,20 @@ function pathToCommands(path, method, body) {
           commands.push(`vxlan source-interface ${body.source}`);
         }
         
-        commands.push('exit');
+        // Handle VLAN to VNI mappings if provided
+        if (body.mappings && Object.keys(body.mappings).length > 0) {
+          // First exit Vxlan1 interface config
+          commands.push('exit');
+          
+          // Configure each VLAN to VNI mapping
+          Object.entries(body.mappings).forEach(([vlanId, vni]) => {
+            commands.push(`vlan ${vlanId}`);
+            commands.push(`vxlan vni ${vni}`);
+            commands.push('exit');
+          });
+        } else {
+          commands.push('exit');
+        }
       }
       break;
       
@@ -251,14 +267,70 @@ function processResponse(data, path, method) {
       type: info.interfaceType || 'unknown',
       vlanId: info.accessVlanId || null
     }));
-  } else if (resource === 'vlans' && !segments[1] && method === 'GET') {
-    // Transform vlans data from Arista format to frontend format
-    processedData = Object.entries(data[0].vlans || {}).map(([id, info]) => ({
-      id: parseInt(id),
-      name: info.name || `VLAN${id}`,
-      state: info.status === 'active' ? 'active' : 'suspended',
-      interfaces: info.interfaces || []
-    }));
+  } else if (resource === 'vlans') {
+    if (method === 'GET') {
+      if (!segments[1]) {
+        // Transform all VLANs data for the frontend
+        if (data[0] && data[0].vlans) {
+          processedData = {
+            vlans: {}
+          };
+          
+          // Process each VLAN
+          Object.entries(data[0].vlans).forEach(([id, info]) => {
+            processedData.vlans[id] = {
+              name: info.name || '',
+              status: info.status || 'active',
+              interfaces: info.interfaces || []
+            };
+          });
+        } else {
+          processedData = { vlans: {} };
+        }
+      } else {
+        // Single VLAN data
+        const vlanId = segments[1];
+        if (data[0] && data[0].vlans && data[0].vlans[vlanId]) {
+          const vlanInfo = data[0].vlans[vlanId];
+          processedData = {
+            id: vlanId,
+            name: vlanInfo.name || '',
+            status: vlanInfo.status || 'active',
+            interfaces: vlanInfo.interfaces || []
+          };
+        }
+      }
+    } else if (method === 'PUT' || method === 'DELETE') {
+      // For PUT and DELETE operations, return success message
+      processedData = { success: true, message: `VLAN operation completed successfully` };
+    }
+  } else if (resource === 'vxlan') {
+    if (method === 'GET') {
+      // Process VXLAN data from multiple commands
+      const vxlanConfig = data[0] || {};
+      const vxlanVni = data[1] || {};
+      
+      // Prepare VXLAN configuration data
+      processedData = {
+        vxlanConfig: {
+          vni: vxlanConfig.vni || null,
+          sourceInterface: vxlanConfig.sourceInterface || null,
+          vlanToVniMap: {}
+        }
+      };
+      
+      // Process VLAN to VNI mappings if available
+      if (vxlanVni && vxlanVni.vnis) {
+        Object.entries(vxlanVni.vnis).forEach(([vni, info]) => {
+          if (info.vlan) {
+            processedData.vxlanConfig.vlanToVniMap[info.vlan] = vni;
+          }
+        });
+      }
+    } else if (method === 'PUT') {
+      // For PUT operations, return success message
+      processedData = { success: true, message: 'VXLAN configuration updated successfully' };
+    }
   }
   
   return processedData;
