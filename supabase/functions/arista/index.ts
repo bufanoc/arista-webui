@@ -95,7 +95,7 @@ function pathToCommands(path: string, method: string, body?: any): string[] {
 async function aristaRequest(path: string, method: string = 'GET', body?: any) {
   const credentials = {
     username: 'admin',
-    password: 'Xm5909ona@@+',
+    password: 'PASSWORDHERE',
     host: '192.168.88.17',
   };
   
